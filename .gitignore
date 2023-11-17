@@ -6,6 +6,9 @@ __pycache__/
 # C extensions
 *.so
 
+class_credit_score.csv
+class_pos_covid.csv
+
 # Distribution / packaging
 .Python
 build/

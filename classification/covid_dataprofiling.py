@@ -1,19 +1,21 @@
 from numpy import ndarray, log
-from pandas import read_csv, DataFrame, Series
+from pandas import read_csv, DataFrame, Series, concat, get_dummies
 from scipy.stats import norm, expon, lognorm
-from seaborn import heatmap
+from seaborn import heatmap, pairplot
 
+import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.pyplot import figure, savefig, show, subplots
 
-from dslab_functions import plot_multiline_chart, plot_multi_scatters_chart, plot_bar_chart, plot_multibar_chart, set_chart_labels, get_variable_types, define_grid, HEIGHT
+from sklearn.preprocessing import OneHotEncoder
+
+from dslab_functions import plot_multiline_chart, plot_multi_scatters_chart, plot_bar_chart, plot_multibar_chart, set_chart_labels, get_variable_types, define_grid, HEIGHT, encode_cyclic_variables, dummify, determine_outlier_thresholds_for_var, count_outliers
 
 # read file
 filename = "class_pos_covid.csv"
 file_tag = "class_pos_covid"
 df : DataFrame = read_csv('class_pos_covid.csv')
-
 ### DATA DIMENSIONALITY ###
 
 # nr of records vs nr of variables
@@ -22,7 +24,7 @@ figure(figsize=(4, 2))
 values: dict[str, int] = {"nr records": df.shape[0], "nr variables": df.shape[1]}
 
 plot_bar_chart(list(values.keys()), list(values.values()), title="Nr of records vs nr of variables")
-savefig(f"images/{file_tag}_records_variables.png")
+savefig(f"images/{file_tag}_records_variables.png", bbox_inches = "tight")
 show()
 
 # description
@@ -43,7 +45,7 @@ figure(figsize=(4, 2))
 plot_bar_chart(
     list(counts.keys()), list(counts.values()), title="Nr of variables per type"
 )
-savefig(f"images/{file_tag}_variable_types.png")
+savefig(f"images/{file_tag}_variable_types.png", bbox_inches = "tight")
 show()
 
 symbolic: list[str] = variable_types["symbolic"]
@@ -57,7 +59,7 @@ for var in df.columns:
     if nr > 0:
         mv[var] = nr
 
-figure()
+figure(figsize = (18,5))
 plot_bar_chart(
     list(mv.keys()),
     list(mv.values()),
@@ -65,13 +67,41 @@ plot_bar_chart(
     xlabel="variables",
     ylabel="nr missing values",
 )
-savefig(f"images/{file_tag}_mv.png")
+savefig(f"images/{file_tag}_mv.png", bbox_inches = "tight")
 show()
 
 ### DATA GRANULARITY ###
 
 # symbolic variables
 
+def analyse_property_granularity(
+    data: DataFrame, property: str, vars: list[str]
+) -> ndarray:
+    cols: int = len(vars)
+    fig: Figure
+    axs: ndarray
+    fig, axs = subplots(1, cols, figsize=(cols * HEIGHT * 4, HEIGHT), squeeze=False)
+    fig.suptitle(f"Granularity study for {property}")
+    for i in range(cols):
+        counts: Series[int] = data[vars[i]].value_counts()
+        plot_bar_chart(
+            counts.index.to_list(),
+            counts.to_list(),
+            ax=axs[0, i],
+            title=vars[i],
+            xlabel=vars[i],
+            ylabel="nr records",
+            percentage=False,
+        )
+    return axs
+
+prop1 = "location"
+prop2 = "smoking"
+analyse_property_granularity(df, prop1, ["State"])
+savefig(f"images/{file_tag}_granularity_{prop1}.png", bbox_inches = "tight")
+analyse_property_granularity(df, prop2, ["SmokerStatus", "ECigaretteUsage"])
+savefig(f"images/{file_tag}_granularity_{prop2}.png", bbox_inches = "tight")
+show()
 
 
 ### DATA DISTRIBUTION ###
@@ -81,8 +111,8 @@ show()
 variables_types: dict[str, list] = get_variable_types(df)
 numeric: list[str] = variables_types["numeric"]
 if [] != numeric:
-    df[numeric].boxplot(rot=45)
-    savefig(f"images/{file_tag}_global_boxplot.png")
+    df[numeric].boxplot(rot=90)
+    savefig(f"images/{file_tag}_global_boxplot.png", bbox_inches = "tight")
     show()
 else:
     print("There are no numeric variables.")
@@ -108,54 +138,6 @@ else:
     print("There are no numeric variables.")
 
 # standard outliers
-NR_STDEV: int = 2
-IQR_FACTOR: float = 1.5
-
-def determine_outlier_thresholds_for_var(
-    summary5: Series, std_based: bool = True, threshold: float = NR_STDEV
-) -> tuple[float, float]:
-    top: float = 0
-    bottom: float = 0
-    if std_based:
-        std: float = threshold * summary5["std"]
-        top = summary5["mean"] + std
-        bottom = summary5["mean"] - std
-    else:
-        iqr: float = threshold * (summary5["75%"] - summary5["25%"])
-        top = summary5["75%"] + iqr
-        bottom = summary5["25%"] - iqr
-
-    return top, bottom
-
-def count_outliers(
-    data: DataFrame,
-    numeric: list[str],
-    nrstdev: int = NR_STDEV,
-    iqrfactor: float = IQR_FACTOR,
-) -> dict:
-    outliers_iqr: list = []
-    outliers_stdev: list = []
-    summary5: DataFrame = data[numeric].describe()
-
-    for var in numeric:
-        top: float
-        bottom: float
-        top, bottom = determine_outlier_thresholds_for_var(
-            summary5[var], std_based=True, threshold=nrstdev
-        )
-        outliers_stdev += [
-            data[data[var] > top].count()[var] + data[data[var] < bottom].count()[var]
-        ]
-
-        top, bottom = determine_outlier_thresholds_for_var(
-            summary5[var], std_based=False, threshold=iqrfactor
-        )
-        outliers_iqr += [
-            data[data[var] > top].count()[var] + data[data[var] < bottom].count()[var]
-        ]
-
-    return {"iqr": outliers_iqr, "stdev": outliers_stdev}
-
 
 if [] != numeric:
     outliers: dict[str, int] = count_outliers(df, numeric)
@@ -224,7 +206,7 @@ symbolic: list[str] = variables_types["symbolic"] + variables_types["binary"]
 if [] != symbolic:
     rows, cols = define_grid(len(symbolic))
     fig, axs = subplots(
-        rows, cols, figsize=(cols * HEIGHT, rows * HEIGHT), squeeze=False
+        rows, cols, figsize=(cols * HEIGHT * 2.5, rows * HEIGHT * 3.5), squeeze=False
     )
     i, j = 0, 0
     for n in range(len(symbolic)):
@@ -239,14 +221,26 @@ if [] != symbolic:
             percentage=False,
         )
         i, j = (i + 1, 0) if (n + 1) % cols == 0 else (i, j + 1)
-    savefig(f"images/{file_tag}_histograms_symbolic.png")
+    savefig(f"images/{file_tag}_histograms_symbolic.png", bbox_inches = "tight")
     show()
 else:
     print("There are no symbolic variables.")
     
 
 # class distribution
+target = "CovidPos"
 
+values: Series = df[target].value_counts()
+print(values)
+
+figure(figsize=(4, 2))
+plot_bar_chart(
+    values.index.to_list(),
+    values.to_list(),
+    title=f"Target distribution (target={target})",
+)
+savefig(f"images/{file_tag}_class_distribution.png", bbox_inches = "tight")
+show()
 
 ### DATA SPARSITY ###
 
@@ -255,18 +249,30 @@ else:
 
 # correlation (all x all - including class)
 variables_types: dict[str, list] = get_variable_types(df)
-numeric: list[str] = variables_types["numeric"]
-corr_mtx: DataFrame = df[numeric].corr().abs()
+symbolic: list[str] = variables_types["symbolic"] + variables_types["binary"]
 
-figure()
+df2: DataFrame = dummify(df, symbolic)
+
+variables_types2: dict[str, list] = get_variable_types(df2)
+numeric2: list[str] = variables_types2["numeric"]
+symbolic2: list[str] = variables_types2["symbolic"] + variables_types2["binary"]
+all_vars = numeric2 + symbolic2
+
+corr_mtx: DataFrame = df2[all_vars].corr().abs()
+
+plt.figure(figsize=(12, 12))
 heatmap(
     abs(corr_mtx),
-    xticklabels=numeric,
-    yticklabels=numeric,
+    xticklabels=all_vars,
+    yticklabels=all_vars,
     annot=False,
     cmap="Blues",
     vmin=0,
     vmax=1,
 )
-savefig(f"images/{file_tag}_correlation_analysis.png")
-show()
+
+plt.xticks(fontsize=3)
+plt.yticks(fontsize=3)
+
+plt.savefig(f"images/{file_tag}_correlation_analysis.png", bbox_inches = "tight")
+plt.show()

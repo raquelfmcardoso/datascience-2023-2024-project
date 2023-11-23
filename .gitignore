@@ -8,6 +8,7 @@ __pycache__/
 
 class_credit_score.csv
 class_pos_covid.csv
+data/*.csv
 
 # Distribution / packaging
 .Python

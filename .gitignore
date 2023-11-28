@@ -8,6 +8,15 @@ __pycache__/
 
 class_credit_score.csv
 class_pos_covid.csv
+data/class_credit_score/data_preparation/balancing/*.csv
+data/class_credit_score/data_preparation/missing_values/*.csv
+data/class_credit_score/data_preparation/outliers/*.csv
+data/class_credit_score/data_preparation/scaling/*.csv
+
+data/class_pos_covid/data_preparation/balancing/*.csv
+data/class_pos_covid/data_preparation/missing_values/*.csv
+data/class_pos_covid/data_preparation/outliers/*.csv
+data/class_pos_covid/data_preparation/scaling/*.csv
 
 # Distribution / packaging
 .Python

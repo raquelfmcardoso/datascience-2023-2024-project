@@ -1,0 +1,7 @@
+Approach 1:
+median, most_frequent, most_frequent
+min_pct_per_variable=0.7, min_pct_per_record=0.9
+
+Approach 2:
+mean, most_frequent, most_frequent
+min_pct_per_variable=0.85, min_pct_per_record=0.9

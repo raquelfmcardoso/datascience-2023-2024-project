@@ -6,6 +6,8 @@ __pycache__/
 # C extensions
 *.so
 
+classification/data
+
 class_credit_score.csv
 class_pos_covid.csv
 data/class_credit_score/data_preparation/balancing/*.csv

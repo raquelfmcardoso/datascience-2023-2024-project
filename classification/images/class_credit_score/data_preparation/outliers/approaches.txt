@@ -1,0 +1,5 @@
+Approach 1:
+Drop outliers, True, threshold: 3
+
+Approach 2:
+Replace outliers, True, threshold: 3
